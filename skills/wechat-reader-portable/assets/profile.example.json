@@ -1,0 +1,9 @@
+{
+  "schema": "wechat.reader-profile.v1",
+  "db_root": "/path/to/private-runtime/db_storage",
+  "credential_file": "/path/to/private-runtime/credentials/passphrase.txt",
+  "reader_bin": "/path/to/verified-tools/greenbubbles",
+  "acquire_bin": "/path/to/verified-tools/greenbubbles-acquire",
+  "reader_sha256": "<expected-reader-sha256>",
+  "acquire_sha256": "<expected-acquire-sha256>"
+}
