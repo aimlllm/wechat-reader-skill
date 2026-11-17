@@ -1,4 +1,4 @@
 interface:
-  display_name: "微信只读与备用方案"
-  short_description: "验证本地读取，选择密钥恢复、OCR和归档路线"
-  default_prompt: "使用 $wechat-reader-portable 在已有授权范围内检查读取状态，并选择合适的备用方案。"
+  display_name: "微信本地数据库接入"
+  short_description: "先检查本地凭据与捕获前置，完成数据库验证后只读查询，不以截图取钥"
+  default_prompt: "使用 $wechat-reader-portable 按固定本地数据库路线检查首次接入，明确权限和凭据阶段，再验证真实消息读取。"

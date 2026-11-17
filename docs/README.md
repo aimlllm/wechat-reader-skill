@@ -6,3 +6,4 @@
 - [技术合同](technical/overview.md)：私有输入、安全投影与恢复。
 - [复用选择](decisions/reuse.md)：集成 GreenBubbles，不另造解密器。
 - [发布验证](delivery/public-release.md)：已验证与未验证边界。
+- [首次数据库接入改进](delivery/database-bootstrap.md)：固定路由、实现分工及验证。

@@ -4,6 +4,8 @@
 
 这不是官方微信 API，也不是一键安装器。首次使用需要在自己的 Mac 上准备工具和验证兼容性；准备完成后，普通查询通常不需要重新登录或管理员权限。
 
+**首次固定走本地数据库路线。**先检查已有凭据；缺密钥时，使用既有本地过滤捕获器处理经允许的私有微信副本。初始化不依赖代理截图、OCR或读屏，UI blank不代表数据库不可读。本人登录、手机确认和必要的系统授权仍可能需要。
+
 ## 开始前准备什么
 
 - 一台运行微信并拥有目标聊天历史的 Mac，以及能访问本地文件和终端的 Codex 或 Claude Code。远程云端会话不能直接读取这台 Mac。
@@ -18,12 +20,13 @@
 
 ```text
 阅读 README.md、SETUP-PROMPT.md 和 skills/wechat-reader-portable/SKILL.md。
-按其中流程，在这台 Mac 上准备本人微信的只读访问。
+按初始化指南先运行 bootstrap.py，在这台 Mac 上建立本人微信的数据库只读访问。
+不要用UI、截图或OCR取钥，UI空白时保持数据库路线并诊断具体阻塞。
 先检查已有接入；真实配置、密钥和结果都放在仓库外。
 验证全部数据库，再读取我指定会话的一条真实消息；未完成不要报告成功。
 ```
 
-代理应检查当前机器、选择准确账号、核验外部工具、填写私有配置，再验证真实读取。需要取钥时，先准备和核验**独立私有微信副本**，保持正式微信原签名和 SIP 开启；不要直接照搬上游重签正式应用的命令。
+代理应先按[初始化指南](skills/wechat-reader-portable/references/bootstrap.md)运行纯元数据检查，再选择准确账号、核验工具和外置配置。缺凭据、权限问题和待验证会分别报告。捕获配置另有 `capture_filtered.py --preflight-only`；检查通过不等于取得密钥。首次仍须准备并核验**独立私有微信副本**，保持正式签名和SIP；权限按[分层指南](skills/wechat-reader-portable/references/permissions.md)处理，不直接执行上游重签正式应用命令。
 
 ## 可选：安装为长期可调用的 skill
 
@@ -67,9 +70,9 @@
 找出提及或引用我的待回复候选，核对后续回复；说明真实 @ 是否已验证，只草拟，不发送。
 ```
 
-具体命令与私有 profile 见[准备指南](skills/wechat-reader-portable/references/setup.md)；分页、引用与 @ 的判断见[查询指南](skills/wechat-reader-portable/references/querying.md)。
+首次从[bootstrap](skills/wechat-reader-portable/references/bootstrap.md)开始，工具与profile见[准备指南](skills/wechat-reader-portable/references/setup.md)；日常分页、引用与@见[查询指南](skills/wechat-reader-portable/references/querying.md)。
 
-**完成标准：**选定账号正确、全部发现的数据库验证成功、指定会话中真实消息可读；执行过捕获时，还要确认调试器与私有副本已退出、正式微信恢复正常。`Armed`、候选密钥或合成测试通过都不足以证明完成。
+**完成标准：**选定账号正确、全部发现的数据库验证成功、指定会话消息身份与安全正文可读；执行过捕获时还要确认调试器及私有副本已退出、正式微信恢复。bootstrap／预检通过、Armed、候选或合成测试均不足以证明完成。被代理审核拒绝的同一动作须停止，不能靠Mac权限、sudo或人工重跑规避。
 
 ## 隐私与限制
 
@@ -83,6 +86,7 @@
 
 ```sh
 python3 -m unittest discover -s tests -p 'test_*.py'
+python3 skills/wechat-reader-portable/scripts/bootstrap.py --help
 python3 skills/wechat-reader-portable/scripts/capture_filtered.py --self-test
 python3 scripts/privacy_audit.py
 ```

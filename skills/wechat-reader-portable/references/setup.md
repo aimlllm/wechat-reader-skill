@@ -2,6 +2,8 @@
 
 首次部署读本页；日常查询转到 [querying.md](querying.md)。仓库仅提供技能与包装脚本，不含 GreenBubbles、微信应用、数据库或密钥。
 
+首次先运行[bootstrap检查](bootstrap.md)，保持本地数据库路线，不使用代理UI／截图／OCR判断能否取钥。权限按[permissions](permissions.md)分阶段处理；屏幕录制与无障碍不是数据库前置。
+
 ## 安装边界
 
 运行环境需要 Python3.10+。本包装器针对 GreenBubbles v0.10.0 的 JSON 接口；上游目前面向 Apple silicon、macOS14+ 和微信4.1+。这不是其他版本兼容性或新机器真实部署的保证。
@@ -49,5 +51,5 @@ python3 scripts/reader.py --profile "/private/runtime/profile.json" doctor --con
 
 - Python版本不足：使用已安装的 Python3.10+；不要声称 macOS 自带版本必然足够。
 - 路径／权限或工具指纹错误：先核对当前文件和来源，不自动接受新 hash，不修改整个微信容器的权限。
-- 尚无合格私有副本或系统禁止附加：停止取钥，说明当前缺少的准备与本人操作，可用[备用路线](fallbacks.md)读取小范围内容；不能默认关 SIP。
+- 尚无合格私有副本或系统禁止附加：停在[本地初始化](bootstrap.md)的准确阶段，说明缺少的准备或权限，不自动切换UI／OCR；保持SIP，正式签名不改。代理审核拒绝的同一动作不能改成人工重跑或换工具。
 - 全库只部分验证、真实消息为空或覆盖不完整：报告具体状态，不能当成接入成功；同样不能当成暂无消息。
