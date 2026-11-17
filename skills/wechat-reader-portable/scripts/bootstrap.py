@@ -60,6 +60,10 @@ def inspect_profile(profile):
     except Failure as error:
         reason = str(error) if str(error) in PROFILE_FAILURES else 'profile_or_runtime_invalid'
         return unavailable('profile_validation', reason)
+    except (OSError, ValueError):
+        return unavailable('profile_validation', 'runtime_input_unavailable')
+    except Exception:
+        return unavailable('profile_validation', 'profile_or_runtime_invalid')
     try:
         profile.lstat()
     except FileNotFoundError:

@@ -23,9 +23,12 @@ bootstrap退出码3表示仍需准备或验证，不是程序崩溃；2表示检
 python3 scripts/reader.py --profile "/private/runtime/profile.json" doctor
 python3 scripts/reader.py --profile "/private/runtime/profile.json" find "<conversation-name>" --limit 20
 python3 scripts/reader.py --profile "/private/runtime/profile.json" doctor --conversation "<resolved-id>"
+python3 scripts/reader.py --profile "/private/runtime/profile.json" messages --conversation "<resolved-id>" --limit 1
 ```
 
 第一个doctor尚无会话时，`bounded_conversation_read_required`不是密钥失效。准确会话由CLI查找结果和本人选择确定，不借UI标题猜测。权限／工具失败也不是“密钥无效”，先按[权限指南](permissions.md)诊断。
+
+最后一条用于单独核对安全正文；doctor的身份证明不能替代这一步。若仅返回Unknown／未解码媒体，保持正文验收未完成，在同一会话的本人授权范围内选择可读Text／Quote，不打印raw字段来补齐。
 
 ## 3. 无有效凭据：准备并检查本地捕获
 

@@ -224,6 +224,19 @@ class BootstrapTests(unittest.TestCase):
         with patch.object(Path, 'lstat', side_effect=RuntimeError('SYNTHETIC_PRIVATE_VALUE')):
             self.assertEqual(self.inspect()[1]['reason'], 'profile_or_runtime_invalid')
 
+    def test_profile_path_resolution_errors_are_sanitized_before_any_read(self):
+        for error, reason in ((PermissionError('SYNTHETIC_PRIVATE_PATH'), 'runtime_input_unavailable'),
+                              (OSError('SYNTHETIC_PRIVATE_PATH'), 'runtime_input_unavailable'),
+                              (ValueError('SYNTHETIC_PRIVATE_PATH'), 'runtime_input_unavailable'),
+                              (RuntimeError('SYNTHETIC_PRIVATE_PATH'), 'profile_or_runtime_invalid')):
+            with self.subTest(error=type(error).__name__), \
+                 patch.object(bootstrap, 'external_path', side_effect=error), \
+                 patch.object(bootstrap, 'load_profile') as load:
+                code, result = self.inspect()
+                self.assertEqual((code, result['reason']), (2, reason))
+                self.assertNotIn('SYNTHETIC_PRIVATE_PATH', json.dumps(result))
+                load.assert_not_called()
+
     def test_python_gate_and_host_hints_are_metadata_only(self):
         with patch.object(bootstrap.sys, 'version_info', (3, 9, 0)), patch.object(bootstrap, 'load_profile') as load:
             code, result = self.inspect()
