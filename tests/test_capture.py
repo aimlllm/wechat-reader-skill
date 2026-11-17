@@ -67,6 +67,112 @@ class CaptureTests(unittest.TestCase):
              patch.object(capture, 'signature_command', return_value=SimpleNamespace(stdout=sip.encode())):
             return capture.preflight(self.args)
 
+    def flags(self):
+        return [part for key in ('app_path', 'original_app_path', 'verify_bin', 'app_cdhash',
+            'original_cdhash', 'verify_cdhash', 'verifier_sha256', 'db_root', 'output')
+            for part in ('--' + key.replace('_', '-'), str(getattr(self.args, key)))]
+
+    def test_preflight_only_runs_existing_metadata_checks_without_capture_side_effects(self):
+        before = sorted(str(path.relative_to(self.root)) for path in self.root.rglob('*'))
+        forbidden = ('capture', 'read_salt_inventory', 'write_secret', 'write_report',
+                     'run_lldb', 'on_pbkdf', 'CandidateSession', 'find_wechat_pid')
+        console = io.StringIO()
+        existing_preflight = capture.preflight
+        metadata_open = os.open
+        def read_only_open(path, flags, *args, **kwargs):
+            self.assertFalse(flags & (os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_TRUNC | os.O_APPEND))
+            return metadata_open(path, flags, *args, **kwargs)
+        with contextlib.ExitStack() as stack:
+            guards = [stack.enter_context(patch.object(capture, name,
+                      side_effect=AssertionError('unexpected capture side effect'))) for name in forbidden]
+            guards.append(stack.enter_context(patch.object(capture.subprocess, 'Popen',
+                side_effect=AssertionError('unexpected debugger process'))))
+            guards.append(stack.enter_context(patch.object(capture.tempfile, 'TemporaryDirectory',
+                side_effect=AssertionError('unexpected output directory'))))
+            for name in ('mkdir', 'chmod', 'chown', 'unlink', 'replace', 'rename', 'link'):
+                guards.append(stack.enter_context(patch.object(capture.os, name,
+                    side_effect=AssertionError('unexpected filesystem mutation'))))
+            stack.enter_context(patch.object(capture.os, 'open', side_effect=read_only_open))
+            checked = stack.enter_context(patch.object(capture, 'preflight', wraps=existing_preflight))
+            stack.enter_context(patch.object(capture.platform, 'system', return_value='Darwin'))
+            stack.enter_context(patch.object(capture.platform, 'machine', return_value='arm64'))
+            stack.enter_context(patch.object(Path, 'is_file', return_value=True))
+            stack.enter_context(patch.object(capture, 'signature_profile', side_effect=self.profiles()))
+            stack.enter_context(patch.object(capture, 'signature_command',
+                return_value=SimpleNamespace(stdout=b'System Integrity Protection status: enabled.')))
+            stack.enter_context(contextlib.redirect_stdout(console))
+            self.assertEqual(capture.main(['--preflight-only', *self.flags()]), 0)
+            checked.assert_called_once()
+            for key in vars(self.args):
+                if key != 'timeout_seconds':
+                    self.assertEqual(getattr(checked.call_args.args[0], key), getattr(self.args, key))
+            for guard in guards:
+                guard.assert_not_called()
+        self.assertEqual(json.loads(console.getvalue()), {
+            'status': 'preflight_passed', 'stage': 'local_capture_configuration',
+            'capturePerformed': False, 'attachTested': False, 'credentialValidated': False})
+        self.assertFalse(Path(self.args.output).exists())
+        self.assertEqual(sorted(str(path.relative_to(self.root)) for path in self.root.rglob('*')), before)
+        for private in (str(self.root), self.args.app_cdhash, self.args.verifier_sha256):
+            self.assertNotIn(private, console.getvalue())
+
+    def test_preflight_only_keeps_all_required_inputs_and_mode_errors_sanitized(self):
+        flags = self.flags()
+        requests = [['--preflight-only', *flags[:offset], *flags[offset + 2:]]
+                    for offset in range(0, len(flags), 2)]
+        requests += [['--preflight-only', *flags, '--timeout-seconds', value]
+                     for value in ('0', '301', 'SYNTHETIC_PRIVATE_VALUE')]
+        requests += [['--preflight-only', '--self-test', *flags],
+                     ['--preflight-only', *flags, '--SYNTHETIC_PRIVATE_VALUE']]
+        for request in requests:
+            with self.subTest(request=request), contextlib.ExitStack() as stack:
+                preflight = stack.enter_context(patch.object(capture, 'preflight'))
+                operation = stack.enter_context(patch.object(capture, 'capture'))
+                self_test = stack.enter_context(patch.object(capture, 'self_test'))
+                console = io.StringIO()
+                stack.enter_context(contextlib.redirect_stdout(console))
+                with self.assertRaises(SystemExit) as raised:
+                    capture.main(request)
+                self.assertEqual(raised.exception.code, 2)
+                self.assertEqual(json.loads(console.getvalue()), {'status': 'failed', 'reason': 'argument_invalid'})
+                for operation in (preflight, operation, self_test):
+                    operation.assert_not_called()
+                self.assertNotIn(str(self.root), console.getvalue())
+                self.assertNotIn('SYNTHETIC_PRIVATE_VALUE', console.getvalue())
+
+    def test_preflight_only_failures_never_reveal_sensitive_exception_values(self):
+        failures = (capture.CaptureFailure('SYNTHETIC_PRIVATE_SIGNATURE'),
+                    common.Failure('SYNTHETIC_PRIVATE_FINGERPRINT'),
+                    OSError('SYNTHETIC_PRIVATE_PATH'), ValueError('SYNTHETIC_PRIVATE_VALUE'),
+                    RuntimeError('SYNTHETIC_PRIVATE_UNEXPECTED_ERROR'))
+        for failure in failures:
+            with self.subTest(kind=type(failure)), contextlib.ExitStack() as stack:
+                preflight = stack.enter_context(patch.object(capture, 'preflight', side_effect=failure))
+                guards = [stack.enter_context(patch.object(capture, name)) for name in
+                          ('capture', 'read_salt_inventory', 'write_secret', 'write_report', 'run_lldb')]
+                guards.append(stack.enter_context(patch.object(capture.subprocess, 'Popen')))
+                console = io.StringIO()
+                stack.enter_context(contextlib.redirect_stdout(console))
+                code = capture.main(['--preflight-only', *self.flags()])
+                self.assertIn(code, (1, 2))
+                preflight.assert_called_once()
+                for guard in guards:
+                    guard.assert_not_called()
+                report = json.loads(console.getvalue())
+                self.assertEqual(report['reason'], 'capture_failed' if isinstance(failure, RuntimeError)
+                                 else 'capture_preflight_or_tool_failed')
+                self.assertNotIn('SYNTHETIC_PRIVATE', console.getvalue())
+                self.assertNotIn(str(self.root), console.getvalue())
+                self.assertFalse(Path(self.args.output).exists())
+
+    def test_ordinary_capture_entrypoint_is_unchanged_without_preflight_only(self):
+        with patch.object(capture, 'capture', return_value=7) as operation, \
+             patch.object(capture, 'preflight') as metadata:
+            self.assertEqual(capture.main(self.flags()), 7)
+        operation.assert_called_once()
+        self.assertFalse(operation.call_args.args[0].preflight_only)
+        metadata.assert_not_called()
+
     def test_explicit_good_profiles_hashes_and_enabled_sip_pass_without_application_mutation(self):
         verifier, image, original, owner = self.preflight()
         self.assertEqual(verifier, self.verifier)

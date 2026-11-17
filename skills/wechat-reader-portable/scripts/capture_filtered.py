@@ -1282,7 +1282,10 @@ class Parser(argparse.ArgumentParser):
 
 def main(argv=None):
     parser = Parser(description=__doc__)
-    parser.add_argument('--self-test', action='store_true')
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--self-test', action='store_true')
+    mode.add_argument('--preflight-only', action='store_true',
+                      help='Check local configuration only; no capture, attach or credential validation.')
     for flag in ('db-root', 'output', 'app-path', 'app-cdhash', 'original-app-path',
                  'original-cdhash', 'verify-bin', 'verify-cdhash', 'verifier-sha256'):
         parser.add_argument('--' + flag)
@@ -1295,6 +1298,12 @@ def main(argv=None):
     if not all(getattr(args, key) for key in required) or not 1 <= args.timeout_seconds <= 300:
         parser.error('explicit_capture_inputs_required')
     try:
+        if args.preflight_only:
+            preflight(args)
+            print(json.dumps({'status': 'preflight_passed', 'stage': 'local_capture_configuration',
+                              'capturePerformed': False, 'attachTested': False,
+                              'credentialValidated': False}))
+            return 0
         return capture(args)
     except (CaptureFailure, Failure, OSError, ValueError, TypeError, subprocess.SubprocessError):
         print(json.dumps({'status': 'check_unavailable', 'reason': 'capture_preflight_or_tool_failed'}))
